@@ -118,6 +118,11 @@ def _full_qe_run(seedname, dft_params, mode):
     # w90 parts
     qe_wrapper('win_pp')
     qe_wrapper('pw2wan')
+    
+    # constructing bond-centered initial projectors
+    if mpi.is_master_node():
+        bond_centered_amn_proj(seedname="m1", dirc="./", n_wf=24, n_bands=24, dimer_dir=[0, 1, 0], mode="m2")
+
     qe_wrapper('win')
     _run_w90converter(seedname, dft_params['w90_tolerance'])
 
@@ -363,3 +368,124 @@ def csc_flow_control(general_params, solver_params, dft_params, gw_params, advan
     if mpi.is_master_node() and dft_params['dft_code'] == 'vasp':
         print('  solid_dmft: Stopping VASP\n', flush=True)
         vasp.kill(vasp_process_id)
+
+# maybe move to a separate file in the future
+def bond_centered_amn_proj(seedname="m1", dirc="./", n_wf=12, n_bands=22, dimer_dir=[1, 0, 0], mode="m1"):
+    """
+    Transforms atom-centered wannier functions into bond-centered ones
+    by the means of modifying the <seedname>.amn file using pre-defined
+    rotation matrix. This is done in-place, and requires only the old 
+    <seedname>.amn file and a <seedname>.win file for a list of k-points.
+
+    Parameters
+    ----------
+    seedname : string
+        seedname for the W90 calculation
+    dirc : string
+        directory hosting the <seedname>.amn and kps.txt files
+    n_wf : int
+        number of wannier functions
+    n_bands : int
+        number of bands
+    dimer_dir : list
+        direction vector for the dimer
+    mode : string
+        mode of operation ("m1" or "m2")
+
+    Returns
+    -------
+    None
+    """
+
+    with open(dirc + f"{seedname}.win") as file:
+        kps_txt = file.read().split("begin kpoints")[1].split("\n")[1:-2]
+        kps = []
+        for i in kps_txt:
+            kps.append([float(k) for k in i.split()])
+
+    n_k = len(kps)
+    amn_head = np.genfromtxt(dirc + f"{seedname}.amn", dtype="str", max_rows=1)
+    if amn_head[2] == "0":
+        print("amn_proj already done")
+    amn_data = np.loadtxt(dirc + f"{seedname}.amn", skiprows=2)
+    save_shape = amn_data.shape
+    assert amn_data.shape[0] == n_k * n_bands * n_wf
+    amn_data = amn_data.reshape((n_k, n_wf, n_bands, 5))
+
+    projmat_amn = amn_data[:, :, :, 3] + 1j * amn_data[:, :, :, 4]
+
+    # create rotation matrix
+    rotmat = np.array([np.eye(n_wf, dtype=complex)] * n_k)
+
+    for i in range(n_k):
+        starting_phase = 1j * np.pi / 4
+        phase = 1j * 2 * np.pi * ((np.dot(kps[i], dimer_dir)))
+        delta = -1 / 4
+        phase00 = delta * phase
+        phase03 = -delta * phase
+        phase30 = (delta - 1 / 2) * phase
+        phase33 = (-delta - 1 / 2) * phase
+
+        if mode == "m1":
+            diag_indices_033 = [0, 1, 2]
+            diag_indices_333 = [3, 4, 5]
+
+            for idx in diag_indices_033:
+                rotmat[i, idx, idx] = np.exp(+starting_phase + phase00)
+            for idx in diag_indices_333:
+                rotmat[i, idx, idx] = np.exp(+starting_phase + phase33)
+
+            for offset in range(6):
+                rotmat[i, 6 + offset, 6 + offset] = rotmat[i, offset, offset]
+
+            for j in range(3):
+                rotmat[i, j, j + 3] = np.exp(-starting_phase + phase03)
+                rotmat[i, j + 3, j] = np.exp(-starting_phase + phase30)
+
+                rotmat[i, j + 6, j + 9] = rotmat[i, j, j + 3]
+                rotmat[i, j + 9, j + 6] = rotmat[i, j + 3, j]
+
+        elif mode == "m2":
+            n_orbs = 3
+            bottom = [3, 6, 12, 18]
+            top = [0, 9, 15, 21]
+
+            diag_phase00 = np.exp(+starting_phase + phase00)
+            diag_phase33 = np.exp(+starting_phase + phase33)
+
+            for orb in range(n_orbs):
+                for b in bottom:
+                    rotmat[i, b + orb, b + orb] = diag_phase00
+                for t in top:
+                    rotmat[i, t + orb, t + orb] = diag_phase33
+
+                # Off-diagonal terms: [from, to, phase]
+                off_diags = [
+                    (0, 6, phase30), (3, 9, phase03),
+                    (6, 0, phase03), (9, 3, phase30),
+                    (12, 21, phase03), (15, 18, phase30),
+                    (18, 15, phase03), (21, 12, phase30),
+                ]
+
+                for from_idx, to_idx, phase in off_diags:
+                    rotmat[i, from_idx + orb, to_idx + orb] = np.exp(-starting_phase + phase)
+
+
+    nrml = 1 / np.sqrt(2)
+    rotmat = nrml * rotmat
+
+    projmat_amn_bab = np.einsum("kab,kbc->kac", rotmat, projmat_amn)
+
+    # save data
+    amn_data[:, :, :, 3] = np.real(projmat_amn_bab)
+    amn_data[:, :, :, 4] = np.imag(projmat_amn_bab)
+
+    save_amn_data = amn_data.reshape(save_shape)
+
+    start_str = f" Created on 0 at  0: 0: 0  \n          {n_bands}         {n_k}          {n_wf}"
+    fmt = "%d", "%d", "%d", "%1.12f", "%1.12f"
+    np.savetxt(
+        dirc + f"{seedname}.amn", save_amn_data, fmt=fmt, header=start_str, comments=""
+    )
+
+    return None
