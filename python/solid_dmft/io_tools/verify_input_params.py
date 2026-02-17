@@ -28,6 +28,11 @@ def _verify_input_params_general(params: FullConfig) -> None:
     if params['general']['calc_energies'] and any(entry['type'] == 'ftps' for entry in params['solver']):
         raise ValueError('"calc_energies" is not valid for solver of type = "ftps"')
 
+    if params['general']['n_iter_dmft'] is None:
+        raise ValueError('"n_iter_dmft" must be specified.')
+    elif params['general']['n_iter_dmft'] < 0:
+        raise ValueError('"n_iter_dmft" must be at least 0.')
+
     # Checks validity of other general params
     h_int_type_options = (
         'density_density',
@@ -110,8 +115,8 @@ def _verify_input_params_solver(params: FullConfig) -> None:
                        entry['legendre_fit'],
                        entry['improved_estimator'],
                        entry['perform_tail_fit']]
-            if sum(tail_op) > 1:
-                raise ValueError('Only one of the options "crm_dyson_solver", "legendre_fit", "improved_estimator", and "perform_tail_fit" can be set to True.')
+            if sum(tail_op) > 1 and not (entry['improved_estimator'] and entry['perform_tail_fit']):
+                raise ValueError('Only one of the options "crm_dyson_solver", "legendre_fit", "improved_estimator", and "perform_tail_fit" can be set to True. You can only combine "improved_estimator" and "perform_tail_fit".')
         if entry['type'] == 'cthyb':
             tail_op = [entry['crm_dyson_solver'],
                        entry['legendre_fit'],

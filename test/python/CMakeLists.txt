@@ -39,8 +39,10 @@ set (integration_tests
      svo_hubbardI_basic
      svo_hartree
      lno_hubbardI_mag
+     lno_cthyb_mag
      svo_cthyb_basic_crm
      svo_cthyb_basic_tf
+     lco_ctseg_tf
      lco_ftps
      nio_cthyb_hartree
      )

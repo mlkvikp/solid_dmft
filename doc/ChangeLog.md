@@ -2,6 +2,42 @@
 
 # Changelog
 
+## Version 3.3.4
+
+solid_dmft version 3.3.4 is a minor patch release that fixes several bugs and improves documentation:
+
+### fix
+* afm mapping did not work with G and Sigma moments and occupations attributes of cthyb
+* make n_orb initialization for self-energy safer
+* add check for n_iter_dmft not None and =>0
+* fix deprecated ast features
+
+### doc
+* change name of config.toml to dmft_config.toml in NNO afm tutorial
+
+### test
+* add missing test for afm order and cthyb for better test coverage
+
+### build
+* update GitHub Actions dependencies (actions/checkout from 5 to 6)
+* merge dev app4triqs updates
+
+We thank all contributors: Alexander Hampel
+
+solid_dmft version 3.3.3 is a minor patch release that fixes a few small bugs:
+
+### fix
+* missing imports in _ctseg_postprocessing
+* magnetic calc enforced if h_field set
+* hartree interface postprocessing stored unsymmetrized Gfimp
+* fix tail fitting for ctseg
+* add LCO ctseg test
+
+### build
+* add ctseg to docker images for testing
+
+We thank all contributors: jmmshn, Thomas Hahn, and Alexander Hampel
+
 ## Version 3.3.2
 
 solid_dmft version 3.3.2 is a minor patch release that fixes a few small bugs and improves documentation:
