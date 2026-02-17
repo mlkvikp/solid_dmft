@@ -186,6 +186,11 @@ projector_type = "w90"
 store_eigenvals = false
 w90_exec = "wannier90.x"
 w90_tolerance = 1e-6
+bond_center = false
+bond_center_dir = "./"
+bond_center_n_wf = 24
+bond_center_n_bands = 24
+bond_center_mode = "m2"
 
 [gw]
 code = "<none>"

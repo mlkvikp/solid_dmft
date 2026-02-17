@@ -486,6 +486,19 @@ w90_exec : string, default ='wannier90.x'
         the command to start a single-core wannier run
 w90_tolerance : float, default = 1e-6
         threshold for mapping of shells and checks of the Hamiltonian
+bond_center : bool, default = False
+	use the bond-centered construction
+bond_center_dir : str, default = "./"
+	directory of the source amn file for the bond-centered construction
+bond_center_n_wf : int, default = 24
+	number of Wannier functions considered for the bond-centered construction
+bond_center_n_bands : int, default = 24
+	number of bands considered for the bond-centered construction
+bond_center_mode : str, default = "m2"
+	pre-set mode for the bond-centered construction
+	
+	*'m1' - M1-like unit cell, 12 WFs, with dimers pointing in x direction
+	*'m2' - M2-like unit cell, 24 WFs, with dimers pointing in y direction
 
 [  gw  ]
 --------
